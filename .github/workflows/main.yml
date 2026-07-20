@@ -25,21 +25,23 @@ jobs:
           flutter-version: '3.24.0'
           channel: 'stable'
 
-      # Yeh step automatic fresh Android aur baki saara structure create karega
       - name: Re-create Flutter Project Structure
         run: |
           cd ..
           flutter create --org com.example skycast
-          cp -r SkyCast-Weather-App/lib skycast/
-          cp SkyCast-Weather-App/pubspec.yaml skycast/
-          mv skycast SkyCast-Weather-App-New
-          rm -rf SkyCast-Weather-App
-          mv SkyCast-Weather-App-New SkyCast-Weather-App
-          cd SkyCast-Weather-App
+          cp -r ${{ github.workspace }}/lib skycast/
+          cp ${{ github.workspace }}/pubspec.yaml skycast/
+          rm -rf ${{ github.workspace }}
+          mv skycast ${{ github.workspace }}
+          cd ${{ github.workspace }}
           flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release --dart-define=WEATHER_API_KEY=${{ secrets.WEATHER_API_KEY }}
+        env:
+          WEATHER_KEY: ${{ secrets.WEATHER_API_KEY }}
+        run: |
+          cd ${{ github.workspace }}
+          flutter build apk --release --dart-define=WEATHER_API_KEY="$WEATHER_KEY" --android-skip-build-dependency-validation
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
