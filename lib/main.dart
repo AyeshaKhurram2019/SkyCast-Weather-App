@@ -28,7 +28,7 @@ class WeatherHomeScreen extends StatefulWidget {
 
 class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
   // Variables for Data
-  String cityName = "Rawalpindi"; // Default sheher
+  String cityName = "Rawalpindi"; 
   double tempInCelsius = 0.0;
   String weatherCondition = "Loading...";
   int humidity = 0;
@@ -37,7 +37,9 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
   List hourlyForecast = [];
   bool isLoading = true;
 
-  // Search Controller to get text from Search Bar
+  // 🟢 FIXED: Yeh line GitHub Secret (WEATHER_API_KEY) ko build ke waqt code mein integrate karegi
+  static const String apiKey = String.fromEnvironment('WEATHER_API_KEY');
+
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -46,31 +48,25 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
     fetchWeatherData();
   }
 
-  // Fetching Weather Data (Current + Hourly + Details)
   Future<void> fetchWeatherData() async {
     setState(() {
       isLoading = true;
     });
 
     try {
-      // 🟢 FIXED: Aapki batayi hui WEATHER_API_KEY variable direct integrate ho gayi hai
+      // 🟢 FIXED: Yahan ab dynamic 'apiKey' variable link ho gaya hai
       final url = Uri.parse(
-          'https://api.openweathermap.org/data/2.5/forecast?q=$cityName&appid=$WEATHER_API_KEY&units=metric');
+          'https://api.openweathermap.org/data/2.5/forecast?q=$cityName&appid=$apiKey&units=metric');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         
         setState(() {
-          // Current Data Mapping (Bug Fixed)
           tempInCelsius = data['list'][0]['main']['temp'].toDouble();
           weatherCondition = data['list'][0]['weather'][0]['main'];
-          
-          // Humidity and Wind Speed
           humidity = data['list'][0]['main']['humidity'];
           windSpeed = data['list'][0]['wind']['speed'].toDouble();
-          
-          // Hourly Forecast Data
           hourlyForecast = data['list'].sublist(0, 8); 
           isLoading = false;
         });
@@ -85,7 +81,6 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
     }
   }
 
-  // Helper function to convert Celsius to Fahrenheit
   double convertToFahrenheit(double celsius) {
     return (celsius * 9 / 5) + 32;
   }
@@ -126,7 +121,6 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // World Wide Search Bar Element
             Row(
               children: [
                 Expanded(
@@ -160,8 +154,6 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
               ],
             ),
             const SizedBox(height: 20),
-
-            // Main body area (loading or content)
             Expanded(
               child: isLoading
                   ? const Center(child: CircularProgressIndicator(color: Colors.white))
@@ -173,7 +165,6 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
                           style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w500, letterSpacing: 1.2),
                         ),
                         const SizedBox(height: 10),
-                        // Main Temp Display
                         Text(
                           isCelsius 
                               ? "${tempInCelsius.toStringAsFixed(1)}°C"
@@ -182,15 +173,12 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
                           style: const TextStyle(fontSize: 70, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 5),
-                        // Condition
                         Text(
                           weatherCondition,
                           textAlign: TextAlign.center,
                           style: const TextStyle(fontSize: 22, fontStyle: FontStyle.italic, color: Colors.white70),
                         ),
                         const SizedBox(height: 25),
-                        
-                        // Humidity & Wind Speed Row
                         Container(
                           padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
                           decoration: BoxDecoration(
@@ -220,19 +208,14 @@ class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
                             ],
                           ),
                         ),
-                        
                         const SizedBox(height: 30),
                         const Divider(color: Colors.white30),
                         const SizedBox(height: 20),
-                        
-                        // Hourly Forecast Title
                         const Text(
                           "Hourly Forecast",
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 15),
-                        
-                        // Hourly Horizontal ListView
                         SizedBox(
                           height: 150, 
                           child: ListView.builder(
