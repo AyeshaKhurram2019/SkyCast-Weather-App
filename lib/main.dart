@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:http/http.dart' as http; 
 
 void main() {
   runApp(const SkyCastApp());
@@ -13,11 +13,7 @@ class SkyCastApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'SkyCast',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-      ),
+      theme: ThemeData.dark(), 
       home: const WeatherHomeScreen(),
     );
   }
@@ -31,211 +27,262 @@ class WeatherHomeScreen extends StatefulWidget {
 }
 
 class _WeatherHomeScreenState extends State<WeatherHomeScreen> {
-  final TextEditingController _searchController = TextEditingController();
-  
-  // Weather Variables
-  String cityName = "Lahore";
-  double temperature = 0.0;
+  // Variables for Data
+  String cityName = "Rawalpindi"; // Default sheher
+  double tempInCelsius = 0.0;
   String weatherCondition = "Loading...";
   int humidity = 0;
   double windSpeed = 0.0;
+  bool isCelsius = true;
+  List hourlyForecast = [];
   bool isLoading = true;
-  String errorMessage = "";
 
-  // Securely fetching API Key compiled via --dart-define
-  final String apiKey = const String.fromEnvironment('WEATHER_API_KEY', defaultValue: 'YOUR_DEFAULT_API_KEY');
+  // Search Controller to get text from Search Bar
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    fetchWeather(cityName);
+    fetchWeatherData();
   }
 
-  Future<void> fetchWeather(String city) async {
+  // Fetching Weather Data (Current + Hourly + Details)
+  Future<void> fetchWeatherData() async {
     setState(() {
       isLoading = true;
-      errorMessage = "";
     });
 
-    final url = Uri.parse(
-      'https://api.openweathermap.org/data/2.5/weather?q=$city&units=metric&appid=$apiKey'
-    );
-
     try {
+      // 🟢 FIXED: Aapki batayi hui WEATHER_API_KEY variable direct integrate ho gayi hai
+      final url = Uri.parse(
+          'https://api.openweathermap.org/data/2.5/forecast?q=$cityName&appid=$WEATHER_API_KEY&units=metric');
       final response = await http.get(url);
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        
         setState(() {
-          cityName = data['name'];
-          temperature = data['main']['temp'].toDouble();
-          weatherCondition = data['weather'][0]['main'];
-          humidity = data['main']['humidity'];
-          windSpeed = data['wind']['speed'].toDouble();
+          // Current Data Mapping (Bug Fixed)
+          tempInCelsius = data['list'][0]['main']['temp'].toDouble();
+          weatherCondition = data['list'][0]['weather'][0]['main'];
+          
+          // Humidity and Wind Speed
+          humidity = data['list'][0]['main']['humidity'];
+          windSpeed = data['list'][0]['wind']['speed'].toDouble();
+          
+          // Hourly Forecast Data
+          hourlyForecast = data['list'].sublist(0, 8); 
           isLoading = false;
         });
       } else {
-        setState(() {
-          errorMessage = "City not found! Please try again.";
-          isLoading = false;
-        });
+        throw Exception('Failed to load data');
       }
     } catch (e) {
       setState(() {
-        errorMessage = "No Internet Connection or Server Error.";
+        weatherCondition = "City not found";
         isLoading = false;
       });
     }
   }
 
-  // Dynamic Background Colors based on Weather
-  List<Color> getBackgroundColors() {
-    switch (weatherCondition.toLowerCase()) {
-      case 'clear':
-        return [Colors.orangeAccent, Colors.blueAccent];
-      case 'clouds':
-        return [Colors.blueGrey.shade400, Colors.blueGrey.shade700];
-      case 'rain':
-      case 'drizzle':
-      case 'thunderstorm':
-        return [Colors.indigo.shade600, Colors.grey.shade900];
-      default:
-        return [Colors.blue.shade300, Colors.blue.shade700];
-    }
+  // Helper function to convert Celsius to Fahrenheit
+  double convertToFahrenheit(double celsius) {
+    return (celsius * 9 / 5) + 32;
   }
 
-  // Dynamic Weather Icons
-  IconData getWeatherIcon() {
-    switch (weatherCondition.toLowerCase()) {
-      case 'clear':
-        return Icons.wb_sunny;
-      case 'clouds':
-        return Icons.cloud;
-      case 'rain':
-      case 'drizzle':
-        return Icons.umbrella;
-      case 'thunderstorm':
-        return Icons.flash_on;
-      default:
-        return Icons.cloud_queue;
-    }
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    Color backgroundGradient = weatherCondition.toLowerCase().contains('rain') 
+        ? Colors.blueGrey.shade900 
+        : Colors.blue.shade900;
+
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: getBackgroundColors(),
+      backgroundColor: backgroundGradient,
+      appBar: AppBar(
+        title: const Text("SkyCast"), 
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(isCelsius ? Icons.thermostat : Icons.text_fields),
+            tooltip: isCelsius ? "Switch to °F" : "Switch to °C",
+            onPressed: () {
+              setState(() {
+                isCelsius = !isCelsius; 
+              });
+            },
           ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // World Wide Search Bar Element
+            Row(
               children: [
-                // Search Bar Row
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          hintText: 'Enter city name...',
-                          hintStyle: const TextStyle(color: Colors.white70),
-                          filled: true,
-                          fillColor: Colors.white.withOpacity(0.2),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(30),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    IconButton(
-                      icon: const Icon(Icons.search, color: Colors.white, size: 28),
-                      onPressed: () {
-                        if (_searchController.text.trim().isNotEmpty) {
-                          fetchWeather(_searchController.text.trim());
-                        }
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 50),
-
-                // Main Content Area
                 Expanded(
-                  child: isLoading
-                      ? const Center(child: CircularProgressIndicator(color: Colors.white))
-                      : errorMessage.isNotEmpty
-                          ? Center(child: Text(errorMessage, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)))
-                          : RefreshIndicator(
-                              onRefresh: () => fetchWeather(cityName),
-                              child: SingleChildScrollView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      cityName,
-                                      style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Icon(getWeatherIcon(), size: 100, color: Colors.white),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      '${temperature.toStringAsFixed(1)}°C',
-                                      style: const TextStyle(color: Colors.white, fontSize: 64, fontWeight: FontWeight.w200),
-                                    ),
-                                    Text(
-                                      weatherCondition,
-                                      style: const TextStyle(color: Colors.white70, fontSize: 24, fontStyle: FontStyle.italic),
-                                    ),
-                                    const SizedBox(height: 50),
-
-                                    // Weather Stats Cards
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                      children: [
-                                        _buildWeatherStatCard(Icons.water_drop, 'Humidity', '$humidity%'),
-                                        _buildWeatherStatCard(Icons.air, 'Wind', '${windSpeed.toStringAsFixed(1)} m/s'),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: "Search any city...",
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.1),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                FloatingActionButton.small(
+                  onPressed: () {
+                    if (_searchController.text.isNotEmpty) {
+                      setState(() {
+                        cityName = _searchController.text;
+                      });
+                      fetchWeatherData(); 
+                    }
+                  },
+                  backgroundColor: Colors.blueAccent,
+                  child: const Icon(Icons.search, color: Colors.white),
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
+            const SizedBox(height: 20),
 
-  Widget _buildWeatherStatCard(IconData icon, String title, String value) {
-    return Container(
-      width: 140,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: Colors.white, size: 28),
-          const SizedBox(height: 8),
-          Text(title, style: const TextStyle(color: Colors.white70, fontSize: 14)),
-          const SizedBox(height: 4),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-        ],
+            // Main body area (loading or content)
+            Expanded(
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                  : ListView( 
+                      children: [
+                        Text(
+                          cityName.toUpperCase(),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w500, letterSpacing: 1.2),
+                        ),
+                        const SizedBox(height: 10),
+                        // Main Temp Display
+                        Text(
+                          isCelsius 
+                              ? "${tempInCelsius.toStringAsFixed(1)}°C"
+                              : "${convertToFahrenheit(tempInCelsius).toStringAsFixed(1)}°F",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 70, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 5),
+                        // Condition
+                        Text(
+                          weatherCondition,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 22, fontStyle: FontStyle.italic, color: Colors.white70),
+                        ),
+                        const SizedBox(height: 25),
+                        
+                        // Humidity & Wind Speed Row
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              Column(
+                                children: [
+                                  const Icon(Icons.water_drop, color: Colors.blueAccent),
+                                  const SizedBox(height: 5),
+                                  const Text("Humidity", style: TextStyle(color: Colors.white60, fontSize: 12)),
+                                  Text("$humidity%", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                ],
+                              ),
+                              Container(width: 1, height: 40, color: Colors.white24), 
+                              Column(
+                                children: [
+                                  const Icon(Icons.air, color: Colors.tealAccent),
+                                  const SizedBox(height: 5),
+                                  const Text("Wind Speed", style: TextStyle(color: Colors.white60, fontSize: 12)),
+                                  Text("${windSpeed.toStringAsFixed(1)} m/s", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 30),
+                        const Divider(color: Colors.white30),
+                        const SizedBox(height: 20),
+                        
+                        // Hourly Forecast Title
+                        const Text(
+                          "Hourly Forecast",
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 15),
+                        
+                        // Hourly Horizontal ListView
+                        SizedBox(
+                          height: 150, 
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: hourlyForecast.length,
+                            itemBuilder: (context, index) {
+                              final hourlyData = hourlyForecast[index];
+                              final hourlyTemp = hourlyData['main']['temp'].toDouble();
+                              final hourlyCond = hourlyData['weather'][0]['main'];
+                              final time = hourlyData['dt_txt'].toString().substring(11, 16); 
+                              
+                              final double pop = hourlyData['pop'] != null ? hourlyData['pop'].toDouble() : 0.0;
+                              final int rainChances = (pop * 100).round();
+
+                              return Container(
+                                width: 95,
+                                margin: const EdgeInsets.only(right: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    Text(time, style: const TextStyle(color: Colors.white60)),
+                                    Icon(
+                                      hourlyCond.toLowerCase().contains('rain') ? Icons.thunderstorm : Icons.wb_cloudy,
+                                      color: Colors.white,
+                                    ),
+                                    Text(
+                                      "$rainChances% Rain",
+                                      style: const TextStyle(fontSize: 11, color: Colors.blueAccent, fontWeight: FontWeight.w600),
+                                    ),
+                                    Text(
+                                      isCelsius
+                                          ? "${hourlyTemp.toStringAsFixed(0)}°C"
+                                          : "${convertToFahrenheit(hourlyTemp).toStringAsFixed(0)}°F",
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
